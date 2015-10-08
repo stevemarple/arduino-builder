@@ -32,6 +32,7 @@ package test
 import (
 	"arduino.cc/builder"
 	"arduino.cc/builder/constants"
+	"arduino.cc/builder/types"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
@@ -39,7 +40,17 @@ import (
 
 func TestSketchWithNoBuildProps(t *testing.T) {
 	var err error
+
 	context := make(map[string]interface{})
+	
+	commands := []types.Command{
+                &builder.SetupHumanLoggerIfMissing{},
+	}
+
+	for _, command := range commands {
+                err := command.Run(context)
+                NoError(t, err)
+        }
 
 	context[constants.CTX_BUILD_PATH] = "buildPath"
 	context[constants.CTX_HARDWARE_FOLDERS] = []string{"hardware"}
@@ -67,6 +78,15 @@ func TestSketchWithNoBuildProps(t *testing.T) {
 func TestSketchWithBuildProps(t *testing.T) {
 	var err error
 	context := make(map[string]interface{})
+
+	commands := []types.Command{
+                &builder.SetupHumanLoggerIfMissing{},
+	}
+
+	for _, command := range commands {
+                err := command.Run(context)
+                NoError(t, err)
+        }
 
 	context[constants.CTX_BUILD_PATH] = "buildPath"
 	context[constants.CTX_HARDWARE_FOLDERS] = []string{"hardware"}

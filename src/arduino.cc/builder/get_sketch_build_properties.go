@@ -31,6 +31,7 @@ package builder
 
 import (
 	"arduino.cc/builder/constants"
+	"arduino.cc/builder/i18n"
 	"arduino.cc/builder/props"
 	"github.com/go-errors/errors"
 	"os"
@@ -49,13 +50,15 @@ func GetSketchBuildPropertiesFilename(context map[string]interface{}) (string, e
 
 
 func GetSketchBuildProperties(context map[string]interface{}) (map[string]string, error) {
+        logger := context[constants.CTX_LOGGER].(i18n.Logger)
+
 	filename, err := GetSketchBuildPropertiesFilename(context)
 	if err != nil {
 		return nil, err
 	}
 	_, err = os.Stat(filename)
 	if err == nil {
-		return props.SafeLoad(filename)
+		return props.SafeLoad(filename, logger)
 	}
 	return make(map[string]string), nil
 }
