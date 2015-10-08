@@ -25,6 +25,7 @@
  * the GNU General Public License.
  *
  * Copyright 2015 Arduino LLC (http://www.arduino.cc/)
+ * Copyright 2015 Matthijs Kooijman
  */
 
 package main
@@ -46,7 +47,7 @@ import (
 	"syscall"
 )
 
-const VERSION = "1.0.0-beta22"
+const VERSION = "1.0.0"
 
 const FLAG_COMPILE = "compile"
 const FLAG_DUMP_PREFS = "dump-prefs"
@@ -70,6 +71,7 @@ const FLAG_LOGGER_HUMAN = "human"
 const FLAG_LOGGER_MACHINE = "machine"
 const FLAG_LIB_DISCOVERY_RECURSION_PATH = "lib-discovery-recursion-depth"
 const FLAG_VERSION = "version"
+const FLAG_VID_PID = "vid-pid"
 
 type slice []string
 
@@ -109,6 +111,7 @@ var libraryDiscoveryRecursionDepthFlag *int
 var warningsLevelFlag *string
 var loggerFlag *string
 var versionFlag *bool
+var vidPidFlag *string
 
 func init() {
 	compileFlag = flag.Bool(FLAG_COMPILE, false, "compiles the given sketch")
@@ -127,6 +130,7 @@ func init() {
 	loggerFlag = flag.String(FLAG_LOGGER, FLAG_LOGGER_HUMAN, "Sets type of logger. Available values are '"+FLAG_LOGGER_HUMAN+"', '"+FLAG_LOGGER_MACHINE+"'")
 	libraryDiscoveryRecursionDepthFlag = flag.Int(FLAG_LIB_DISCOVERY_RECURSION_PATH, builder.DEFAULT_LIBRARY_DISCOVERY_RECURSION_DEPTH, "How deep should library discovery go down looking for included libraries")
 	versionFlag = flag.Bool(FLAG_VERSION, false, "prints version and exits")
+	vidPidFlag = flag.String(FLAG_VID_PID, "", "specify to use vid/pid specific build properties, as defined in boards.txt")
 }
 
 func main() {
@@ -246,6 +250,10 @@ func main() {
 		}
 	}
 	context[constants.CTX_BUILD_PATH] = buildPath
+
+	if *vidPidFlag != "" {
+		context[constants.CTX_VIDPID] = *vidPidFlag
+	}
 
 	if compile && flag.NArg() == 0 {
 		fmt.Fprintln(os.Stderr, "Last parameter must be the sketch to compile")
