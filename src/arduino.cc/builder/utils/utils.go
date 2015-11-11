@@ -44,6 +44,14 @@ import (
 	"strings"
 )
 
+func KeysOfMapOfStringInterface(input map[string]interface{}) []string {
+	var keys []string
+	for key, _ := range input {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 func KeysOfMapOfString(input map[string]string) []string {
 	var keys []string
 	for key, _ := range input {
@@ -205,9 +213,9 @@ func SliceContains(slice []string, target string) bool {
 	return false
 }
 
-func SliceContainsPrototype(slice []*types.Prototype, target *types.Prototype) bool {
+func SliceContainsCTag(slice []map[string]string, target map[string]string) bool {
 	for _, value := range slice {
-		if value.FunctionName == target.FunctionName {
+		if value[constants.CTAGS_FIELD_FUNCTION_NAME] == target[constants.CTAGS_FIELD_FUNCTION_NAME] {
 			return true
 		}
 	}
@@ -405,4 +413,24 @@ func CollectAllReadableFiles(collector *[]string, test CheckFileExtensionFunc) f
 		return nil
 	}
 	return walkFunc
+}
+
+func AppendIfNotPresent(target []string, elements ...string) []string {
+	for _, element := range elements {
+		if !SliceContains(target, element) {
+			target = append(target, element)
+		}
+	}
+	return target
+}
+
+func LibraryToSourceFolder(library *types.Library) []types.SourceFolder {
+	sourceFolders := []types.SourceFolder{}
+	recurse := library.Layout == types.LIBRARY_RECURSIVE
+	sourceFolders = append(sourceFolders, types.SourceFolder{Folder: library.SrcFolder, Recurse: recurse})
+	if library.Layout == types.LIBRARY_FLAT {
+		utility := filepath.Join(library.SrcFolder, constants.LIBRARY_FOLDER_UTILITY)
+		sourceFolders = append(sourceFolders, types.SourceFolder{Folder: utility, Recurse: false})
+	}
+	return sourceFolders
 }

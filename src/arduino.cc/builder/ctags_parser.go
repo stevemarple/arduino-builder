@@ -31,8 +31,6 @@ package builder
 
 import (
 	"arduino.cc/builder/constants"
-	"arduino.cc/builder/types"
-	"arduino.cc/builder/utils"
 	"strconv"
 	"strings"
 )
@@ -42,20 +40,25 @@ const FIELD_LINE = "line"
 const FIELD_SIGNATURE = "signature"
 const FIELD_RETURNTYPE = "returntype"
 const FIELD_CODE = "code"
-const FIELD_FUNCTION_NAME = "functionName"
 const FIELD_CLASS = "class"
 const FIELD_STRUCT = "struct"
+const FIELD_NAMESPACE = "namespace"
 const FIELD_SKIP = "skipMe"
 
 const KIND_PROTOTYPE = "prototype"
+const KIND_FUNCTION = "function"
+const KIND_PROTOTYPE_MODIFIERS = "prototype_modifiers"
 
 const TEMPLATE = "template"
+const STATIC = "static"
+const TRUE = "true"
 
-var FIELDS = map[string]bool{"kind": true, "line": true, "typeref": true, "signature": true, "returntype": true, "class": true, "struct": true}
+var FIELDS = map[string]bool{"kind": true, "line": true, "typeref": true, "signature": true, "returntype": true, "class": true, "struct": true, "namespace": true}
 var KNOWN_TAG_KINDS = map[string]bool{"prototype": true, "function": true}
+var FIELDS_MARKING_UNHANDLED_TAGS = []string{FIELD_CLASS, FIELD_STRUCT, FIELD_NAMESPACE}
 
 type CTagsParser struct {
-	PrototypesField string
+	CTagsField string
 }
 
 func (s *CTagsParser) Run(context map[string]interface{}) error {
@@ -68,45 +71,25 @@ func (s *CTagsParser) Run(context map[string]interface{}) error {
 		tags = append(tags, parseTag(row))
 	}
 
-	tags = filterOutUnknownTags(tags)
-	tags = filterOutTagsWithField(tags, FIELD_CLASS)
-	tags = filterOutTagsWithField(tags, FIELD_STRUCT)
-	tags = skipTagsWhere(tags, signatureContainsDefaultArg)
-	tags = addPrototypes(tags)
-	tags = removeDefinedProtypes(tags)
-	tags = removeDuplicate(tags)
+	skipTagsWhere(tags, tagIsUnknown)
+	skipTagsWithField(tags, FIELDS_MARKING_UNHANDLED_TAGS)
+	skipTagsWhere(tags, signatureContainsDefaultArg)
+	addPrototypes(tags)
+	removeDefinedProtypes(tags)
+	removeDuplicate(tags)
+	skipTagsWhere(tags, prototypeAndCodeDontMatch)
 
-	if len(tags) > 0 {
-		line, err := strconv.Atoi(tags[0][FIELD_LINE])
-		if err != nil {
-			return utils.WrapError(err)
-		}
-		context[constants.CTX_FIRST_FUNCTION_AT_LINE] = line
-	}
-
-	prototypes := toPrototypes(tags)
-
-	context[s.PrototypesField] = prototypes
+	context[s.CTagsField] = tags
 
 	return nil
 }
 
-func toPrototypes(tags []map[string]string) []*types.Prototype {
-	prototypes := []*types.Prototype{}
+func addPrototypes(tags []map[string]string) {
 	for _, tag := range tags {
-		if tag[FIELD_SKIP] != "true" {
-			ctag := types.Prototype{FunctionName: tag[FIELD_FUNCTION_NAME], Prototype: tag[KIND_PROTOTYPE], Fields: tag}
-			prototypes = append(prototypes, &ctag)
+		if tag[FIELD_SKIP] != TRUE {
+			addPrototype(tag)
 		}
 	}
-	return prototypes
-}
-
-func addPrototypes(tags []map[string]string) []map[string]string {
-	for _, tag := range tags {
-		addPrototype(tag)
-	}
-	return tags
 }
 
 func addPrototype(tag map[string]string) {
@@ -118,12 +101,19 @@ func addPrototype(tag map[string]string) {
 			code = code[:strings.LastIndex(code, ")")+1]
 		}
 		tag[KIND_PROTOTYPE] = code + ";"
-	} else {
-		tag[KIND_PROTOTYPE] = tag[FIELD_RETURNTYPE] + " " + tag[FIELD_FUNCTION_NAME] + tag[FIELD_SIGNATURE] + ";"
+		return
 	}
+
+	tag[KIND_PROTOTYPE] = tag[FIELD_RETURNTYPE] + " " + tag[constants.CTAGS_FIELD_FUNCTION_NAME] + tag[FIELD_SIGNATURE] + ";"
+
+	tag[KIND_PROTOTYPE_MODIFIERS] = ""
+	if strings.Index(tag[FIELD_CODE], STATIC+" ") != -1 {
+		tag[KIND_PROTOTYPE_MODIFIERS] = tag[KIND_PROTOTYPE_MODIFIERS] + " " + STATIC
+	}
+	tag[KIND_PROTOTYPE_MODIFIERS] = strings.TrimSpace(tag[KIND_PROTOTYPE_MODIFIERS])
 }
 
-func removeDefinedProtypes(tags []map[string]string) []map[string]string {
+func removeDefinedProtypes(tags []map[string]string) {
 	definedPrototypes := make(map[string]bool)
 	for _, tag := range tags {
 		if tag[FIELD_KIND] == KIND_PROTOTYPE {
@@ -131,70 +121,91 @@ func removeDefinedProtypes(tags []map[string]string) []map[string]string {
 		}
 	}
 
-	var newTags []map[string]string
 	for _, tag := range tags {
-		if !definedPrototypes[tag[KIND_PROTOTYPE]] {
-			newTags = append(newTags, tag)
+		if definedPrototypes[tag[KIND_PROTOTYPE]] {
+			tag[FIELD_SKIP] = TRUE
 		}
 	}
-	return newTags
 }
 
-func removeDuplicate(tags []map[string]string) []map[string]string {
+func removeDuplicate(tags []map[string]string) {
 	definedPrototypes := make(map[string]bool)
 
-	var newTags []map[string]string
 	for _, tag := range tags {
 		if !definedPrototypes[tag[KIND_PROTOTYPE]] {
-			newTags = append(newTags, tag)
 			definedPrototypes[tag[KIND_PROTOTYPE]] = true
+		} else {
+			tag[FIELD_SKIP] = TRUE
 		}
 	}
-	return newTags
 }
 
 type skipFuncType func(tag map[string]string) bool
 
-func skipTagsWhere(tags []map[string]string, skipFuncs ...skipFuncType) []map[string]string {
+func skipTagsWhere(tags []map[string]string, skipFuncs ...skipFuncType) {
 	for _, tag := range tags {
-		skip := skipFuncs[0](tag)
-		for _, skipFunc := range skipFuncs[1:] {
-			skip = skip || skipFunc(tag)
+		if tag[FIELD_SKIP] != TRUE {
+			skip := skipFuncs[0](tag)
+			for _, skipFunc := range skipFuncs[1:] {
+				skip = skip || skipFunc(tag)
+			}
+			tag[FIELD_SKIP] = strconv.FormatBool(skip)
 		}
-		tag[FIELD_SKIP] = strconv.FormatBool(skip)
 	}
-	return tags
 }
 
 func signatureContainsDefaultArg(tag map[string]string) bool {
 	return strings.Contains(tag[FIELD_SIGNATURE], "=")
 }
 
-func filterOutTagsWithField(tags []map[string]string, field string) []map[string]string {
-	var newTags []map[string]string
-	for _, tag := range tags {
-		if tag[field] == constants.EMPTY_STRING {
-			newTags = append(newTags, tag)
-		}
+func prototypeAndCodeDontMatch(tag map[string]string) bool {
+	if tag[FIELD_SKIP] == TRUE {
+		return true
 	}
-	return newTags
+
+	code := removeSpacesAndTabs(tag[FIELD_CODE])
+	prototype := removeSpacesAndTabs(tag[KIND_PROTOTYPE])
+	prototype = removeTralingSemicolon(prototype)
+
+	return strings.Index(code, prototype) == -1
 }
 
-func filterOutUnknownTags(tags []map[string]string) []map[string]string {
-	var newTags []map[string]string
+func removeTralingSemicolon(s string) string {
+	return s[0 : len(s)-1]
+}
+
+func removeSpacesAndTabs(s string) string {
+	s = strings.Replace(s, " ", "", -1)
+	s = strings.Replace(s, "\t", "", -1)
+	return s
+}
+
+func skipTagsWithField(tags []map[string]string, fields []string) {
 	for _, tag := range tags {
-		if KNOWN_TAG_KINDS[tag[FIELD_KIND]] {
-			newTags = append(newTags, tag)
+		if tagHasAtLeastOneField(tag, fields) {
+			tag[FIELD_SKIP] = TRUE
 		}
 	}
-	return newTags
+}
+
+func tagHasAtLeastOneField(tag map[string]string, fields []string) bool {
+	for _, field := range fields {
+		if tag[field] != constants.EMPTY_STRING {
+			return true
+		}
+	}
+	return false
+}
+
+func tagIsUnknown(tag map[string]string) bool {
+	return !KNOWN_TAG_KINDS[tag[FIELD_KIND]]
 }
 
 func parseTag(row string) map[string]string {
 	tag := make(map[string]string)
 	parts := strings.Split(row, "\t")
 
-	tag[FIELD_FUNCTION_NAME] = parts[0]
+	tag[constants.CTAGS_FIELD_FUNCTION_NAME] = parts[0]
 	parts = parts[1:]
 
 	for _, part := range parts {

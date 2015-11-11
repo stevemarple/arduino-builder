@@ -69,9 +69,10 @@ type OsUrl struct {
 }
 
 type Library struct {
-	Name    string
-	Version string
-	Url     string
+	Name                   string
+	Version                string
+	VersionInLibProperties string
+	Url                    string
 }
 
 type Core struct {
@@ -83,22 +84,25 @@ type Core struct {
 
 func DownloadCoresAndToolsAndLibraries(t *testing.T) {
 	cores := []Core{
-		Core{Maintainer: "arduino", Arch: "avr", Version: "1.6.8"},
-		Core{Maintainer: "arduino", Arch: "sam", Version: "1.6.4"},
+		Core{Maintainer: "arduino", Arch: "avr", Version: "1.6.9"},
+		Core{Maintainer: "arduino", Arch: "sam", Version: "1.6.5"},
 	}
 
 	boardsManagerCores := []Core{
-		Core{Maintainer: "arduino", Arch: "samd", Version: "1.6.1"},
+		Core{Maintainer: "arduino", Arch: "samd", Version: "1.6.2"},
 	}
 
 	boardsManagerRedBearCores := []Core{
 		Core{Maintainer: "RedBearLab", Arch: "avr", Version: "1.0.0", Url: "https://redbearlab.github.io/arduino/Blend/blend_boards.zip"},
 	}
 
+	toolsMultipleVersions := []Tool{
+		Tool{Name: "bossac", Version: "1.6.1-arduino"},
+		Tool{Name: "bossac", Version: "1.5-arduino"},
+	}
+
 	tools := []Tool{
 		Tool{Name: "avrdude", Version: "6.0.1-arduino5"},
-		Tool{Name: "bossac", Version: "1.3a-arduino"},
-		Tool{Name: "bossac", Version: "1.5-arduino"},
 		Tool{Name: "avr-gcc", Version: "4.8.1-arduino5"},
 		Tool{Name: "arm-none-eabi-gcc", Version: "4.8.3-2014q1"},
 		Tool{Name: "coan", Version: "5.2", OsUrls: []OsUrl{
@@ -107,12 +111,12 @@ func DownloadCoresAndToolsAndLibraries(t *testing.T) {
 			OsUrl{Os: "i686-mingw32", Url: "http://downloads.arduino.cc/tools/coan-5.2-i686-mingw32.zip"},
 			OsUrl{Os: "x86_64-apple-darwin", Url: "http://downloads.arduino.cc/tools/coan-5.2-x86_64-apple-darwin.zip"},
 		}},
-		Tool{Name: "ctags", Version: "5.8-arduino1",
+		Tool{Name: "ctags", Version: "5.8-arduino4",
 			OsUrls: []OsUrl{
-				OsUrl{Os: "i686-pc-linux-gnu", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino1-i686-pc-linux-gnu.tar.bz2"},
-				OsUrl{Os: "x86_64-pc-linux-gnu", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino1-x86_64-pc-linux-gnu.tar.bz2"},
-				OsUrl{Os: "i686-mingw32", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino1-i686-mingw32.zip"},
-				OsUrl{Os: "x86_64-apple-darwin", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino1-x86_64-apple-darwin.zip"},
+				OsUrl{Os: "i686-pc-linux-gnu", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino4-i686-pc-linux-gnu.tar.bz2"},
+				OsUrl{Os: "x86_64-pc-linux-gnu", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino4-x86_64-pc-linux-gnu.tar.bz2"},
+				OsUrl{Os: "i686-mingw32", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino4-i686-mingw32.zip"},
+				OsUrl{Os: "x86_64-apple-darwin", Url: "http://downloads.arduino.cc/tools/ctags-5.8-arduino4-x86_64-apple-darwin.zip"},
 			}},
 	}
 
@@ -125,15 +129,14 @@ func DownloadCoresAndToolsAndLibraries(t *testing.T) {
 	}
 
 	libraries := []Library{
-		Library{Name: "Audio", Version: "1.0.3"},
+		Library{Name: "Audio", Version: "1.0.4"},
 		Library{Name: "Adafruit PN532", Version: "1.0.0"},
-		Library{Name: "Bridge", Version: "1.0.7"},
-		Library{Name: "CapacitiveSensor", Version: "0.5.0"},
+		Library{Name: "Bridge", Version: "1.1.0"},
+		Library{Name: "CapacitiveSensor", Version: "0.5.0", VersionInLibProperties: "0.5"},
 		Library{Name: "Robot IR Remote", Version: "1.0.2"},
-		//Library{Name: "HID", Version: "0.0.0", Url: "https://github.com/NicoHood/HID/archive/dev_2_4.zip"},
 	}
 
-	download(t, cores, boardsManagerCores, boardsManagerRedBearCores, tools, boardsManagerTools, boardsManagerRFduinoTools, libraries)
+	download(t, cores, boardsManagerCores, boardsManagerRedBearCores, tools, toolsMultipleVersions, boardsManagerTools, boardsManagerRFduinoTools, libraries)
 
 	patchFiles(t)
 }
@@ -157,7 +160,7 @@ func patchFiles(t *testing.T) {
 	}
 }
 
-func download(t *testing.T, cores, boardsManagerCores, boardsManagerRedBearCores []Core, tools, boardsManagerTools, boardsManagerRFduinoTools []Tool, libraries []Library) {
+func download(t *testing.T, cores, boardsManagerCores, boardsManagerRedBearCores []Core, tools, toolsMultipleVersions, boardsManagerTools, boardsManagerRFduinoTools []Tool, libraries []Library) {
 	allCoresDownloaded, err := allCoresAlreadyDownloadedAndUnpacked(HARDWARE_FOLDER, cores)
 	NoError(t, err)
 	if allCoresDownloaded &&
@@ -166,6 +169,7 @@ func download(t *testing.T, cores, boardsManagerCores, boardsManagerRedBearCores
 		allBoardsManagerToolsAlreadyDownloadedAndUnpacked(BOARD_MANAGER_FOLDER, boardsManagerTools) &&
 		allBoardsManagerToolsAlreadyDownloadedAndUnpacked(BOARD_MANAGER_FOLDER, boardsManagerRFduinoTools) &&
 		allToolsAlreadyDownloadedAndUnpacked(TOOLS_FOLDER, tools) &&
+		allToolsAlreadyDownloadedAndUnpacked(TOOLS_FOLDER, toolsMultipleVersions) &&
 		allLibrariesAlreadyDownloadedAndUnpacked(LIBRARIES_FOLDER, libraries) {
 		return
 	}
@@ -180,6 +184,9 @@ func download(t *testing.T, cores, boardsManagerCores, boardsManagerRedBearCores
 	NoError(t, err)
 
 	err = downloadTools(tools, index)
+	NoError(t, err)
+
+	err = downloadToolsMultipleVersions(toolsMultipleVersions, index)
 	NoError(t, err)
 
 	err = downloadBoardsManagerTools(boardsManagerTools, index)
@@ -279,7 +286,36 @@ func downloadTools(tools []Tool, index map[string]interface{}) error {
 		if err != nil {
 			return utils.WrapError(err)
 		}
-		err = downloadAndUnpackTool(tool, url, TOOLS_FOLDER)
+		err = downloadAndUnpackTool(tool, url, TOOLS_FOLDER, true)
+		if err != nil {
+			return utils.WrapError(err)
+		}
+	}
+
+	return nil
+}
+
+func downloadToolsMultipleVersions(tools []Tool, index map[string]interface{}) error {
+	host := translateGOOSGOARCHToPackageIndexValue()
+
+	for _, tool := range tools {
+		if !toolAlreadyDownloadedAndUnpacked(TOOLS_FOLDER, tool) {
+			_, err := os.Stat(filepath.Join(TOOLS_FOLDER, tool.Name))
+			if err == nil {
+				err = os.RemoveAll(filepath.Join(TOOLS_FOLDER, tool.Name))
+				if err != nil {
+					return utils.WrapError(err)
+				}
+			}
+		}
+	}
+
+	for _, tool := range tools {
+		url, err := findToolUrl(index, tool, host)
+		if err != nil {
+			return utils.WrapError(err)
+		}
+		err = downloadAndUnpackTool(tool, url, TOOLS_FOLDER, false)
 		if err != nil {
 			return utils.WrapError(err)
 		}
@@ -391,7 +427,15 @@ func allLibrariesAlreadyDownloadedAndUnpacked(targetPath string, libraries []Lib
 
 func libraryAlreadyDownloadedAndUnpacked(targetPath string, library Library) bool {
 	_, err := os.Stat(filepath.Join(targetPath, strings.Replace(library.Name, " ", "_", -1)))
-	return !os.IsNotExist(err)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	libProps, err := props.Load(filepath.Join(targetPath, strings.Replace(library.Name, " ", "_", -1), "library.properties"), i18n.HumanLogger{})
+	if err != nil {
+		return false
+	}
+	return libProps["version"] == library.Version || libProps["version"] == library.VersionInLibProperties
 }
 
 func downloadAndUnpackCore(core Core, url string, targetPath string) error {
@@ -413,6 +457,14 @@ func downloadAndUnpackCore(core Core, url string, targetPath string) error {
 		return utils.WrapError(err)
 	}
 	defer os.RemoveAll(unpackFolder)
+
+	_, err = os.Stat(filepath.Join(targetPath, core.Maintainer, core.Arch))
+	if err == nil {
+		err = os.RemoveAll(filepath.Join(targetPath, core.Maintainer, core.Arch))
+		if err != nil {
+			return utils.WrapError(err)
+		}
+	}
 
 	if len(files) == 1 && files[0].IsDir() {
 		err = os.MkdirAll(filepath.Join(targetPath, core.Maintainer), os.FileMode(0755))
@@ -454,6 +506,14 @@ func downloadAndUnpackBoardManagerCore(core Core, url string, targetPath string)
 		return utils.WrapError(err)
 	}
 	defer os.RemoveAll(unpackFolder)
+
+	_, err = os.Stat(filepath.Join(targetPath, core.Maintainer, "hardware", core.Arch))
+	if err == nil {
+		err = os.RemoveAll(filepath.Join(targetPath, core.Maintainer, "hardware", core.Arch))
+		if err != nil {
+			return utils.WrapError(err)
+		}
+	}
 
 	if len(files) == 1 && files[0].IsDir() {
 		err = os.MkdirAll(filepath.Join(targetPath, core.Maintainer, "hardware", core.Arch), os.FileMode(0755))
@@ -521,7 +581,7 @@ func downloadAndUnpackBoardsManagerTool(tool Tool, url string, targetPath string
 	return nil
 }
 
-func downloadAndUnpackTool(tool Tool, url string, targetPath string) error {
+func downloadAndUnpackTool(tool Tool, url string, targetPath string, deleteIfMissing bool) error {
 	if toolAlreadyDownloadedAndUnpacked(targetPath, tool) {
 		return nil
 	}
@@ -537,11 +597,13 @@ func downloadAndUnpackTool(tool Tool, url string, targetPath string) error {
 	}
 	defer os.RemoveAll(unpackFolder)
 
-	_, err = os.Stat(filepath.Join(targetPath, tool.Name))
-	if err == nil {
-		err = os.RemoveAll(filepath.Join(targetPath, tool.Name))
-		if err != nil {
-			return utils.WrapError(err)
+	if deleteIfMissing {
+		_, err = os.Stat(filepath.Join(targetPath, tool.Name))
+		if err == nil {
+			err = os.RemoveAll(filepath.Join(targetPath, tool.Name))
+			if err != nil {
+				return utils.WrapError(err)
+			}
 		}
 	}
 
@@ -719,6 +781,14 @@ func downloadAndUnpackLibrary(library Library, url string, targetPath string) er
 		return utils.WrapError(err)
 	}
 	defer os.RemoveAll(unpackFolder)
+
+	_, err = os.Stat(filepath.Join(targetPath, strings.Replace(library.Name, " ", "_", -1)))
+	if err == nil {
+		err = os.RemoveAll(filepath.Join(targetPath, strings.Replace(library.Name, " ", "_", -1)))
+		if err != nil {
+			return utils.WrapError(err)
+		}
+	}
 
 	err = copyRecursive(filepath.Join(unpackFolder, files[0].Name()), filepath.Join(targetPath, strings.Replace(library.Name, " ", "_", -1)))
 	if err != nil {

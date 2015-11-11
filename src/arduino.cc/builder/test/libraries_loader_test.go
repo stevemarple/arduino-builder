@@ -46,7 +46,8 @@ func TestLoadLibrariesAVR(t *testing.T) {
 
 	context[constants.CTX_HARDWARE_FOLDERS] = []string{filepath.Join("..", "hardware"), "hardware", "downloaded_hardware"}
 	context[constants.CTX_FQBN] = "arduino:avr:leonardo"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
 
 	commands := []types.Command{
 		&builder.SetupHumanLoggerIfMissing{},
@@ -61,8 +62,14 @@ func TestLoadLibrariesAVR(t *testing.T) {
 		NoError(t, err)
 	}
 
+	librariesFolders := context[constants.CTX_LIBRARIES_FOLDERS].([]string)
+	require.Equal(t, 3, len(librariesFolders))
+	require.Equal(t, Abs(t, filepath.Join("downloaded_libraries")), librariesFolders[0])
+	require.Equal(t, Abs(t, filepath.Join("downloaded_hardware", "arduino", "avr", "libraries")), librariesFolders[1])
+	require.Equal(t, Abs(t, filepath.Join("libraries")), librariesFolders[2])
+
 	libraries := context[constants.CTX_LIBRARIES].([]*types.Library)
-	require.Equal(t, 14, len(libraries))
+	require.Equal(t, 17, len(libraries))
 
 	sort.Sort(ByLibraryName(libraries))
 
@@ -102,6 +109,8 @@ func TestLoadLibrariesAVR(t *testing.T) {
 	idx++
 	require.Equal(t, "FakeAudio", libraries[idx].Name)
 	idx++
+	require.Equal(t, "HID", libraries[idx].Name)
+	idx++
 	require.Equal(t, "IRremote", libraries[idx].Name)
 	idx++
 	require.Equal(t, "Robot_IR_Remote", libraries[idx].Name)
@@ -110,14 +119,18 @@ func TestLoadLibrariesAVR(t *testing.T) {
 	idx++
 	require.Equal(t, "SPI", libraries[idx].Name)
 	idx++
+	require.Equal(t, "ShouldNotRecurseWithOldLibs", libraries[idx].Name)
+	idx++
 	require.Equal(t, "SoftwareSerial", libraries[idx].Name)
+	idx++
+	require.Equal(t, "USBHost", libraries[idx].Name)
 	idx++
 	require.Equal(t, "Wire", libraries[idx].Name)
 
 	headerToLibraries := context[constants.CTX_HEADER_TO_LIBRARIES].(map[string][]*types.Library)
 	require.Equal(t, 2, len(headerToLibraries["Audio.h"]))
-	require.Equal(t, "FakeAudio", headerToLibraries["Audio.h"][0].Name)
-	require.Equal(t, "Audio", headerToLibraries["Audio.h"][1].Name)
+	require.Equal(t, "Audio", headerToLibraries["Audio.h"][0].Name)
+	require.Equal(t, "FakeAudio", headerToLibraries["Audio.h"][1].Name)
 	require.Equal(t, 1, len(headerToLibraries["FakeAudio.h"]))
 	require.Equal(t, "FakeAudio", headerToLibraries["FakeAudio.h"][0].Name)
 	require.Equal(t, 1, len(headerToLibraries["Adafruit_PN532.h"]))
@@ -139,7 +152,8 @@ func TestLoadLibrariesSAM(t *testing.T) {
 
 	context[constants.CTX_HARDWARE_FOLDERS] = []string{filepath.Join("..", "hardware"), "hardware", "downloaded_hardware"}
 	context[constants.CTX_FQBN] = "arduino:sam:arduino_due_x_dbg"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
 
 	commands := []types.Command{
 		&builder.SetupHumanLoggerIfMissing{},
@@ -154,8 +168,14 @@ func TestLoadLibrariesSAM(t *testing.T) {
 		NoError(t, err)
 	}
 
+	librariesFolders := context[constants.CTX_LIBRARIES_FOLDERS].([]string)
+	require.Equal(t, 3, len(librariesFolders))
+	require.Equal(t, Abs(t, filepath.Join("downloaded_libraries")), librariesFolders[0])
+	require.Equal(t, Abs(t, filepath.Join("downloaded_hardware", "arduino", "sam", "libraries")), librariesFolders[1])
+	require.Equal(t, Abs(t, filepath.Join("libraries")), librariesFolders[2])
+
 	libraries := context[constants.CTX_LIBRARIES].([]*types.Library)
-	require.Equal(t, 12, len(libraries))
+	require.Equal(t, 15, len(libraries))
 
 	sort.Sort(ByLibraryName(libraries))
 
@@ -174,6 +194,8 @@ func TestLoadLibrariesSAM(t *testing.T) {
 	idx++
 	require.Equal(t, "FakeAudio", libraries[idx].Name)
 	idx++
+	require.Equal(t, "HID", libraries[idx].Name)
+	idx++
 	require.Equal(t, "IRremote", libraries[idx].Name)
 	idx++
 	require.Equal(t, "Robot_IR_Remote", libraries[idx].Name)
@@ -181,6 +203,10 @@ func TestLoadLibrariesSAM(t *testing.T) {
 	require.Equal(t, "SPI", libraries[idx].Name)
 	idx++
 	require.Equal(t, "SPI", libraries[idx].Name)
+	idx++
+	require.Equal(t, "ShouldNotRecurseWithOldLibs", libraries[idx].Name)
+	idx++
+	require.Equal(t, "USBHost", libraries[idx].Name)
 	idx++
 	require.Equal(t, "Wire", libraries[idx].Name)
 
@@ -195,8 +221,8 @@ func TestLoadLibrariesSAM(t *testing.T) {
 	require.Equal(t, 1, len(headerToLibraries["FakeAudio.h"]))
 	require.Equal(t, "FakeAudio", headerToLibraries["FakeAudio.h"][0].Name)
 	require.Equal(t, 2, len(headerToLibraries["IRremote.h"]))
-	require.Equal(t, "IRremote", headerToLibraries["IRremote.h"][0].Name)
-	require.Equal(t, "Robot_IR_Remote", headerToLibraries["IRremote.h"][1].Name)
+	require.Equal(t, "Robot_IR_Remote", headerToLibraries["IRremote.h"][0].Name)
+	require.Equal(t, "IRremote", headerToLibraries["IRremote.h"][1].Name)
 }
 
 func TestLoadLibrariesAVRNoDuplicateLibrariesFolders(t *testing.T) {
@@ -206,7 +232,8 @@ func TestLoadLibrariesAVRNoDuplicateLibrariesFolders(t *testing.T) {
 
 	context[constants.CTX_HARDWARE_FOLDERS] = []string{filepath.Join("..", "hardware"), "hardware", "downloaded_hardware"}
 	context[constants.CTX_FQBN] = "arduino:avr:leonardo"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries", filepath.Join("downloaded_hardware", "arduino", "avr", "libraries")}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries", filepath.Join("downloaded_hardware", "arduino", "avr", "libraries")}
 
 	commands := []types.Command{
 		&builder.SetupHumanLoggerIfMissing{},
@@ -221,5 +248,40 @@ func TestLoadLibrariesAVRNoDuplicateLibrariesFolders(t *testing.T) {
 		NoError(t, err)
 	}
 
-	require.Equal(t, 3, len(context[constants.CTX_LIBRARIES_FOLDERS].([]string)))
+	librariesFolders := context[constants.CTX_LIBRARIES_FOLDERS].([]string)
+	require.Equal(t, 3, len(librariesFolders))
+	require.Equal(t, Abs(t, filepath.Join("downloaded_libraries")), librariesFolders[0])
+	require.Equal(t, Abs(t, filepath.Join("downloaded_hardware", "arduino", "avr", "libraries")), librariesFolders[1])
+	require.Equal(t, Abs(t, filepath.Join("libraries")), librariesFolders[2])
+}
+
+func TestLoadLibrariesMyAVRPlatform(t *testing.T) {
+	DownloadCoresAndToolsAndLibraries(t)
+
+	context := make(map[string]interface{})
+
+	context[constants.CTX_HARDWARE_FOLDERS] = []string{filepath.Join("..", "hardware"), "hardware", "user_hardware", "downloaded_hardware"}
+	context[constants.CTX_FQBN] = "my_avr_platform:avr:custom_yun"
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries", filepath.Join("downloaded_hardware", "arduino", "avr", "libraries")}
+
+	commands := []types.Command{
+		&builder.SetupHumanLoggerIfMissing{},
+		&builder.AddAdditionalEntriesToContext{},
+		&builder.HardwareLoader{},
+		&builder.TargetBoardResolver{},
+		&builder.LibrariesLoader{},
+	}
+
+	for _, command := range commands {
+		err := command.Run(context)
+		NoError(t, err)
+	}
+
+	librariesFolders := context[constants.CTX_LIBRARIES_FOLDERS].([]string)
+	require.Equal(t, 4, len(librariesFolders))
+	require.Equal(t, Abs(t, filepath.Join("downloaded_libraries")), librariesFolders[0])
+	require.Equal(t, Abs(t, filepath.Join("downloaded_hardware", "arduino", "avr", "libraries")), librariesFolders[1])
+	require.Equal(t, Abs(t, filepath.Join("user_hardware", "my_avr_platform", "avr", "libraries")), librariesFolders[2])
+	require.Equal(t, Abs(t, filepath.Join("libraries")), librariesFolders[3])
 }

@@ -55,7 +55,7 @@ func TestLoadHardware(t *testing.T) {
 	}
 
 	packages := context[constants.CTX_HARDWARE].(*types.Packages)
-	require.Equal(t, 1, len(packages.Packages))
+	require.Equal(t, 2, len(packages.Packages))
 	require.NotNil(t, packages.Packages["arduino"])
 	require.Equal(t, 2, len(packages.Packages["arduino"].Platforms))
 
@@ -79,7 +79,7 @@ func TestLoadHardware(t *testing.T) {
 	require.Equal(t, "AVRISP mkII", avrPlatform.Programmers["avrispmkii"][constants.PROGRAMMER_NAME])
 
 	require.Equal(t, "{runtime.tools.ctags.path}", packages.Properties["tools.ctags.path"])
-	require.Equal(t, "\"{cmd.path}\" -u --language-force=c++ -f - --c++-kinds=svpf --fields=KSTtzns \"{source_file}\"", packages.Properties["tools.ctags.pattern"])
+	require.Equal(t, "\"{cmd.path}\" -u --language-force=c++ -f - --c++-kinds=svpf --fields=KSTtzns --line-directives \"{source_file}\"", packages.Properties["tools.ctags.pattern"])
 	require.Equal(t, "{runtime.tools.avrdude.path}", packages.Properties["tools.avrdude.path"])
 	require.Equal(t, "-w -x c++ -E -CC", packages.Properties["preproc.macros.flags"])
 }
@@ -105,9 +105,9 @@ func TestLoadHardwareMixingUserHardwareFolder(t *testing.T) {
 
 	if runtime.GOOS == "windows" {
 		//a package is a symlink, and windows does not support them
-		require.Equal(t, 2, len(packages.Packages))
-	} else {
 		require.Equal(t, 3, len(packages.Packages))
+	} else {
+		require.Equal(t, 4, len(packages.Packages))
 	}
 
 	require.NotNil(t, packages.Packages["arduino"])
@@ -144,7 +144,7 @@ func TestLoadHardwareMixingUserHardwareFolder(t *testing.T) {
 	require.False(t, utils.MapStringStringHas(myAVRPlatformAvrArch.Properties, "preproc.includes.flags"))
 
 	require.Equal(t, "{runtime.tools.ctags.path}", packages.Properties["tools.ctags.path"])
-	require.Equal(t, "\"{cmd.path}\" -u --language-force=c++ -f - --c++-kinds=svpf --fields=KSTtzns \"{source_file}\"", packages.Properties["tools.ctags.pattern"])
+	require.Equal(t, "\"{cmd.path}\" -u --language-force=c++ -f - --c++-kinds=svpf --fields=KSTtzns --line-directives \"{source_file}\"", packages.Properties["tools.ctags.pattern"])
 	require.Equal(t, "{runtime.tools.avrdude.path}", packages.Properties["tools.avrdude.path"])
 	require.Equal(t, "-w -x c++ -E -CC", packages.Properties["preproc.macros.flags"])
 	require.Equal(t, "{build.mbed_api_include} {build.nRF51822_api_include} {build.ble_api_include} {compiler.libsam.c.flags} {compiler.arm.cmsis.path} {build.variant_system_include}", packages.Properties["preproc.macros.compatibility_flags"])
@@ -222,9 +222,9 @@ func TestLoadLotsOfHardware(t *testing.T) {
 
 	if runtime.GOOS == "windows" {
 		//a package is a symlink, and windows does not support them
-		require.Equal(t, 4, len(packages.Packages))
-	} else {
 		require.Equal(t, 5, len(packages.Packages))
+	} else {
+		require.Equal(t, 6, len(packages.Packages))
 	}
 
 	require.NotNil(t, packages.Packages["arduino"])

@@ -53,7 +53,8 @@ func TestIncludesToIncludeFolders(t *testing.T) {
 	context[constants.CTX_FQBN] = "arduino:avr:leonardo"
 	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("downloaded_libraries", "Bridge", "examples", "Bridge", "Bridge.ino")
 	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
 	context[constants.CTX_VERBOSE] = false
 
 	commands := []types.Command{
@@ -74,6 +75,10 @@ func TestIncludesToIncludeFolders(t *testing.T) {
 	importedLibraries := context[constants.CTX_IMPORTED_LIBRARIES].([]*types.Library)
 	require.Equal(t, 1, len(importedLibraries))
 	require.Equal(t, "Bridge", importedLibraries[0].Name)
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
+	require.False(t, libraryResolutionResults["Bridge.h"].IsLibraryFromPlatform)
 }
 
 func TestIncludesToIncludeFoldersSketchWithIfDef(t *testing.T) {
@@ -89,7 +94,8 @@ func TestIncludesToIncludeFoldersSketchWithIfDef(t *testing.T) {
 	context[constants.CTX_FQBN] = "arduino:avr:leonardo"
 	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("sketch2", "SketchWithIfDef.ino")
 	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
 	context[constants.CTX_VERBOSE] = false
 
 	commands := []types.Command{
@@ -109,6 +115,9 @@ func TestIncludesToIncludeFoldersSketchWithIfDef(t *testing.T) {
 
 	importedLibraries := context[constants.CTX_IMPORTED_LIBRARIES].([]*types.Library)
 	require.Equal(t, 0, len(importedLibraries))
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
 }
 
 func TestIncludesToIncludeFoldersIRremoteLibrary(t *testing.T) {
@@ -124,7 +133,8 @@ func TestIncludesToIncludeFoldersIRremoteLibrary(t *testing.T) {
 	context[constants.CTX_FQBN] = "arduino:avr:leonardo"
 	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("sketch9", "sketch.ino")
 	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
 	context[constants.CTX_VERBOSE] = false
 
 	commands := []types.Command{
@@ -147,6 +157,11 @@ func TestIncludesToIncludeFoldersIRremoteLibrary(t *testing.T) {
 	require.Equal(t, 2, len(importedLibraries))
 	require.Equal(t, "Bridge", importedLibraries[0].Name)
 	require.Equal(t, "IRremote", importedLibraries[1].Name)
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
+	require.False(t, libraryResolutionResults["Bridge.h"].IsLibraryFromPlatform)
+	require.False(t, libraryResolutionResults["IRremote.h"].IsLibraryFromPlatform)
 }
 
 func TestIncludesToIncludeFoldersANewLibrary(t *testing.T) {
@@ -162,7 +177,8 @@ func TestIncludesToIncludeFoldersANewLibrary(t *testing.T) {
 	context[constants.CTX_FQBN] = "arduino:avr:leonardo"
 	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("sketch10", "sketch.ino")
 	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
 	context[constants.CTX_VERBOSE] = false
 
 	commands := []types.Command{
@@ -185,6 +201,11 @@ func TestIncludesToIncludeFoldersANewLibrary(t *testing.T) {
 	require.Equal(t, 2, len(importedLibraries))
 	require.Equal(t, "ANewLibrary-master", importedLibraries[0].Name)
 	require.Equal(t, "IRremote", importedLibraries[1].Name)
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
+	require.False(t, libraryResolutionResults["anewlibrary.h"].IsLibraryFromPlatform)
+	require.False(t, libraryResolutionResults["IRremote.h"].IsLibraryFromPlatform)
 }
 
 func TestIncludesToIncludeFoldersDuplicateLibs(t *testing.T) {
@@ -200,7 +221,7 @@ func TestIncludesToIncludeFoldersDuplicateLibs(t *testing.T) {
 	context[constants.CTX_FQBN] = "my_avr_platform:avr:custom_yun"
 	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("user_hardware", "my_avr_platform", "avr", "libraries", "SPI", "examples", "BarometricPressureSensor", "BarometricPressureSensor.ino")
 	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
-	context[constants.CTX_LIBRARIES_FOLDERS] = []string{"libraries", "downloaded_libraries"}
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
 	context[constants.CTX_VERBOSE] = false
 
 	commands := []types.Command{
@@ -223,4 +244,93 @@ func TestIncludesToIncludeFoldersDuplicateLibs(t *testing.T) {
 	require.Equal(t, 1, len(importedLibraries))
 	require.Equal(t, "SPI", importedLibraries[0].Name)
 	require.Equal(t, Abs(t, filepath.Join("user_hardware", "my_avr_platform", "avr", "libraries", "SPI")), importedLibraries[0].SrcFolder)
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
+	require.True(t, libraryResolutionResults["SPI.h"].IsLibraryFromPlatform)
+}
+
+func TestIncludesToIncludeFoldersDuplicateLibsWithConflictingLibsOutsideOfPlatform(t *testing.T) {
+	DownloadCoresAndToolsAndLibraries(t)
+
+	context := make(map[string]interface{})
+
+	buildPath := SetupBuildPath(t, context)
+	defer os.RemoveAll(buildPath)
+
+	context[constants.CTX_HARDWARE_FOLDERS] = []string{filepath.Join("..", "hardware"), "hardware", "downloaded_hardware", "user_hardware"}
+	context[constants.CTX_TOOLS_FOLDERS] = []string{"downloaded_tools"}
+	context[constants.CTX_FQBN] = "my_avr_platform:avr:custom_yun"
+	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("user_hardware", "my_avr_platform", "avr", "libraries", "SPI", "examples", "BarometricPressureSensor", "BarometricPressureSensor.ino")
+	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
+	context[constants.CTX_VERBOSE] = false
+
+	commands := []types.Command{
+		&builder.SetupHumanLoggerIfMissing{},
+
+		&builder.ContainerSetupHardwareToolsLibsSketchAndProps{},
+
+		&builder.ContainerMergeCopySketchFiles{},
+
+		&builder.ContainerFindIncludes{},
+	}
+
+	for _, command := range commands {
+		err := command.Run(context)
+		NoError(t, err)
+	}
+
+	importedLibraries := context[constants.CTX_IMPORTED_LIBRARIES].([]*types.Library)
+	sort.Sort(ByLibraryName(importedLibraries))
+	require.Equal(t, 1, len(importedLibraries))
+	require.Equal(t, "SPI", importedLibraries[0].Name)
+	require.Equal(t, Abs(t, filepath.Join("libraries", "SPI")), importedLibraries[0].SrcFolder)
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
+	require.False(t, libraryResolutionResults["SPI.h"].IsLibraryFromPlatform)
+}
+
+func TestIncludesToIncludeFoldersDuplicateLibs2(t *testing.T) {
+	DownloadCoresAndToolsAndLibraries(t)
+
+	context := make(map[string]interface{})
+
+	buildPath := SetupBuildPath(t, context)
+	defer os.RemoveAll(buildPath)
+
+	context[constants.CTX_HARDWARE_FOLDERS] = []string{filepath.Join("..", "hardware"), "hardware", "downloaded_hardware", "downloaded_board_manager_stuff"}
+	context[constants.CTX_TOOLS_FOLDERS] = []string{"downloaded_tools", "downloaded_board_manager_stuff"}
+	context[constants.CTX_FQBN] = "arduino:samd:arduino_zero_native"
+	context[constants.CTX_SKETCH_LOCATION] = filepath.Join("sketch_usbhost", "sketch_usbhost.ino")
+	context[constants.CTX_BUILD_PROPERTIES_RUNTIME_IDE_VERSION] = "10600"
+	context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS] = []string{"downloaded_libraries"}
+	context[constants.CTX_OTHER_LIBRARIES_FOLDERS] = []string{"libraries"}
+
+	commands := []types.Command{
+		&builder.SetupHumanLoggerIfMissing{},
+
+		&builder.ContainerSetupHardwareToolsLibsSketchAndProps{},
+
+		&builder.ContainerMergeCopySketchFiles{},
+
+		&builder.ContainerFindIncludes{},
+	}
+
+	for _, command := range commands {
+		err := command.Run(context)
+		NoError(t, err)
+	}
+
+	importedLibraries := context[constants.CTX_IMPORTED_LIBRARIES].([]*types.Library)
+	sort.Sort(ByLibraryName(importedLibraries))
+	require.Equal(t, 1, len(importedLibraries))
+	require.Equal(t, "USBHost", importedLibraries[0].Name)
+	require.Equal(t, Abs(t, filepath.Join("libraries", "USBHost", "src")), importedLibraries[0].SrcFolder)
+
+	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
+	require.NotNil(t, libraryResolutionResults)
+	require.False(t, libraryResolutionResults["Usb.h"].IsLibraryFromPlatform)
 }

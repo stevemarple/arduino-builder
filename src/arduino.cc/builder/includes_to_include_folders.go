@@ -40,11 +40,15 @@ import (
 type IncludesToIncludeFolders struct{}
 
 func (s *IncludesToIncludeFolders) Run(context map[string]interface{}) error {
-	if !utils.MapHas(context, constants.CTX_LIBRARIES) {
-		return nil
+	includes := []string{}
+	if utils.MapHas(context, constants.CTX_INCLUDES) {
+		includes = context[constants.CTX_INCLUDES].([]string)
 	}
-	includes := context[constants.CTX_INCLUDES].([]string)
-	headerToLibraries := context[constants.CTX_HEADER_TO_LIBRARIES].(map[string][]*types.Library)
+	headerToLibraries := make(map[string][]*types.Library)
+	if utils.MapHas(context, constants.CTX_HEADER_TO_LIBRARIES) {
+		headerToLibraries = context[constants.CTX_HEADER_TO_LIBRARIES].(map[string][]*types.Library)
+	}
+
 	platform := context[constants.CTX_TARGET_PLATFORM].(*types.Platform)
 	actualPlatform := context[constants.CTX_ACTUAL_PLATFORM].(*types.Platform)
 	libraryResolutionResults := context[constants.CTX_LIBRARY_RESOLUTION_RESULTS].(map[string]types.LibraryResolutionResult)
@@ -53,17 +57,20 @@ func (s *IncludesToIncludeFolders) Run(context map[string]interface{}) error {
 	if utils.MapHas(context, constants.CTX_IMPORTED_LIBRARIES) {
 		importedLibraries = context[constants.CTX_IMPORTED_LIBRARIES].([]*types.Library)
 	}
-	newlyImportedLibraries, err := resolveLibraries(includes, headerToLibraries, []*types.Platform{platform, actualPlatform}, libraryResolutionResults)
+	newlyImportedLibraries, err := resolveLibraries(includes, headerToLibraries, importedLibraries, []*types.Platform{actualPlatform, platform}, libraryResolutionResults)
 	if err != nil {
 		return utils.WrapError(err)
 	}
 
-	foldersWithSources := context[constants.CTX_FOLDERS_WITH_SOURCES_QUEUE].(*types.UniqueStringQueue)
+	foldersWithSources := context[constants.CTX_FOLDERS_WITH_SOURCES_QUEUE].(*types.UniqueSourceFolderQueue)
 
 	for _, newlyImportedLibrary := range newlyImportedLibraries {
 		if !sliceContainsLibrary(importedLibraries, newlyImportedLibrary) {
 			importedLibraries = append(importedLibraries, newlyImportedLibrary)
-			foldersWithSources.Push(newlyImportedLibrary.SrcFolder)
+			sourceFolders := utils.LibraryToSourceFolder(newlyImportedLibrary)
+			for _, sourceFolder := range sourceFolders {
+				foldersWithSources.Push(sourceFolder)
+			}
 		}
 	}
 
@@ -92,24 +99,27 @@ func resolveIncludeFolders(importedLibraries []*types.Library, buildProperties m
 }
 
 //FIXME it's also resolving previously resolved libraries
-func resolveLibraries(includes []string, headerToLibraries map[string][]*types.Library, platforms []*types.Platform, libraryResolutionResults map[string]types.LibraryResolutionResult) ([]*types.Library, error) {
+func resolveLibraries(includes []string, headerToLibraries map[string][]*types.Library, importedLibraries []*types.Library, platforms []*types.Platform, libraryResolutionResults map[string]types.LibraryResolutionResult) ([]*types.Library, error) {
 	markImportedLibrary := make(map[*types.Library]bool)
+	for _, library := range importedLibraries {
+		markImportedLibrary[library] = true
+	}
 	for _, header := range includes {
 		resolveLibrary(header, headerToLibraries, markImportedLibrary, platforms, libraryResolutionResults)
 	}
 
-	var importedLibraries []*types.Library
+	var newlyImportedLibraries []*types.Library
 	for library, _ := range markImportedLibrary {
-		importedLibraries = append(importedLibraries, library)
+		newlyImportedLibraries = append(newlyImportedLibraries, library)
 	}
 
-	return importedLibraries, nil
+	return newlyImportedLibraries, nil
 }
 
 func resolveLibrary(header string, headerToLibraries map[string][]*types.Library, markImportedLibrary map[*types.Library]bool, platforms []*types.Platform, libraryResolutionResults map[string]types.LibraryResolutionResult) {
-	libraries := headerToLibraries[header]
+	libraries := append([]*types.Library{}, headerToLibraries[header]...)
 
-	if libraries == nil {
+	if libraries == nil || len(libraries) == 0 {
 		return
 	}
 
@@ -118,14 +128,15 @@ func resolveLibrary(header string, headerToLibraries map[string][]*types.Library
 		return
 	}
 
-	var library *types.Library
-
-	for _, platform := range platforms {
-		if platform != nil && library == nil {
-			librariesWithinSpecifiedPlatform := librariesWithinPlatform(libraries, platform)
-			library = findBestLibraryWithHeader(header, librariesWithinSpecifiedPlatform)
-		}
+	if markImportedLibraryContainsOneOfCandidates(markImportedLibrary, libraries) {
+		return
 	}
+
+	reverse(libraries)
+
+	librariesInPlatforms := librariesInSomePlatform(libraries, platforms)
+
+	var library *types.Library
 
 	for _, platform := range platforms {
 		if platform != nil && library == nil {
@@ -141,19 +152,69 @@ func resolveLibrary(header string, headerToLibraries map[string][]*types.Library
 		library = libraries[0]
 	}
 
-	libraryResolutionResults[header] = types.LibraryResolutionResult{Library: library, NotUsedLibraries: filterOutLibraryFrom(libraries, library)}
+	library = useAlreadyImportedLibraryWithSameNameIfExists(library, markImportedLibrary)
+
+	isLibraryFromPlatform := findLibraryIn(librariesInPlatforms, library) != nil
+	libraryResolutionResults[header] = types.LibraryResolutionResult{Library: library, IsLibraryFromPlatform: isLibraryFromPlatform, NotUsedLibraries: filterOutLibraryFrom(libraries, library)}
 
 	markImportedLibrary[library] = true
 }
 
-func filterOutLibraryFrom(libraries []*types.Library, library *types.Library) []*types.Library {
+//facepalm. sort.Reverse needs an Interface that implements Len/Less/Swap. It's a slice! What else for reversing it?!?
+func reverse(data []*types.Library) {
+	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
+		data[i], data[j] = data[j], data[i]
+	}
+}
+
+func librariesInSomePlatform(libraries []*types.Library, platforms []*types.Platform) []*types.Library {
+	librariesInPlatforms := []*types.Library{}
+	for _, platform := range platforms {
+		if platform != nil {
+			librariesWithinSpecifiedPlatform := librariesWithinPlatform(libraries, platform)
+			librariesInPlatforms = append(librariesInPlatforms, librariesWithinSpecifiedPlatform...)
+		}
+	}
+	return librariesInPlatforms
+}
+
+func markImportedLibraryContainsOneOfCandidates(markImportedLibrary map[*types.Library]bool, libraries []*types.Library) bool {
+	for markedLibrary, _ := range markImportedLibrary {
+		for _, library := range libraries {
+			if markedLibrary == library {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func useAlreadyImportedLibraryWithSameNameIfExists(library *types.Library, markImportedLibrary map[*types.Library]bool) *types.Library {
+	for lib, _ := range markImportedLibrary {
+		if lib.Name == library.Name {
+			return lib
+		}
+	}
+	return library
+}
+
+func filterOutLibraryFrom(libraries []*types.Library, libraryToRemove *types.Library) []*types.Library {
 	filteredOutLibraries := []*types.Library{}
 	for _, lib := range libraries {
-		if lib != library {
+		if lib != libraryToRemove {
 			filteredOutLibraries = append(filteredOutLibraries, lib)
 		}
 	}
 	return filteredOutLibraries
+}
+
+func findLibraryIn(libraries []*types.Library, library *types.Library) *types.Library {
+	for _, lib := range libraries {
+		if lib == library {
+			return lib
+		}
+	}
+	return nil
 }
 
 func libraryCompatibleWithPlatform(library *types.Library, platform *types.Platform) bool {
@@ -178,7 +239,7 @@ func librariesCompatibleWithPlatform(libraries []*types.Library, platform *types
 }
 
 func librariesWithinPlatform(libraries []*types.Library, platform *types.Platform) []*types.Library {
-	var librariesWithinSpecifiedPlatform []*types.Library
+	librariesWithinSpecifiedPlatform := []*types.Library{}
 	for _, library := range libraries {
 		cleanPlatformFolder := filepath.Clean(platform.Folder)
 		cleanLibraryFolder := filepath.Clean(library.SrcFolder)

@@ -110,13 +110,51 @@ func (s *Builder) Run(context map[string]interface{}) error {
 		&MergeSketchWithBootloader{},
 
 		&RecipeByPrefixSuffixRunner{Prefix: constants.HOOKS_POSTBUILD, Suffix: constants.HOOKS_PATTERN_SUFFIX},
+	}
 
+	mainErr := runCommands(context, commands, true)
+
+	commands = []types.Command{
 		&PrintUsedAndNotUsedLibraries{},
 
 		&PrintUsedLibrariesIfVerbose{},
 	}
+	otherErr := runCommands(context, commands, false)
 
-	return runCommands(context, commands)
+	if mainErr != nil {
+		return mainErr
+	}
+
+	return otherErr
+}
+
+type Preprocess struct{}
+
+func (s *Preprocess) Run(context map[string]interface{}) error {
+	commands := []types.Command{
+		&SetupHumanLoggerIfMissing{},
+
+		&GenerateBuildPathIfMissing{},
+		&EnsureBuildPathExists{},
+
+		&ContainerSetupHardwareToolsLibsSketchAndProps{},
+
+		&ContainerBuildOptions{},
+
+		&RecipeByPrefixSuffixRunner{Prefix: constants.HOOKS_PREBUILD, Suffix: constants.HOOKS_PATTERN_SUFFIX},
+
+		&ContainerMergeCopySketchFiles{},
+
+		&ContainerFindIncludes{},
+
+		&WarnAboutArchIncompatibleLibraries{},
+
+		&ContainerAddPrototypes{},
+
+		&PrintPreprocessedSource{},
+	}
+
+	return runCommands(context, commands, true)
 }
 
 type ParseHardwareAndDumpBuildProperties struct{}
@@ -132,17 +170,17 @@ func (s *ParseHardwareAndDumpBuildProperties) Run(context map[string]interface{}
 		&DumpBuildProperties{},
 	}
 
-	return runCommands(context, commands)
+	return runCommands(context, commands, true)
 }
 
-func runCommands(context map[string]interface{}, commands []types.Command) error {
+func runCommands(context map[string]interface{}, commands []types.Command, progressEnabled bool) error {
 	commandsLength := len(commands)
 	progressForEachCommand := float32(100) / float32(commandsLength)
 
 	progress := float32(0)
 	for _, command := range commands {
 		PrintRingNameIfDebug(context, command)
-		printProgressIfMachineLogger(context, progress)
+		printProgressIfProgressEnabledAndMachineLogger(progressEnabled, context, progress)
 		err := command.Run(context)
 		if err != nil {
 			return utils.WrapError(err)
@@ -150,12 +188,16 @@ func runCommands(context map[string]interface{}, commands []types.Command) error
 		progress += progressForEachCommand
 	}
 
-	printProgressIfMachineLogger(context, 100)
+	printProgressIfProgressEnabledAndMachineLogger(progressEnabled, context, 100)
 
 	return nil
 }
 
-func printProgressIfMachineLogger(context map[string]interface{}, progress float32) {
+func printProgressIfProgressEnabledAndMachineLogger(progressEnabled bool, context map[string]interface{}, progress float32) {
+	if !progressEnabled {
+		return
+	}
+
 	log := utils.Logger(context)
 	if log.Name() == "machine" {
 		log.Println(constants.MSG_PROGRESS, strconv.FormatFloat(float64(progress), 'f', 2, 32))
@@ -175,5 +217,10 @@ func RunBuilder(context map[string]interface{}) error {
 
 func RunParseHardwareAndDumpBuildProperties(context map[string]interface{}) error {
 	command := ParseHardwareAndDumpBuildProperties{}
+	return command.Run(context)
+}
+
+func RunPreprocess(context map[string]interface{}) error {
+	command := Preprocess{}
 	return command.Run(context)
 }

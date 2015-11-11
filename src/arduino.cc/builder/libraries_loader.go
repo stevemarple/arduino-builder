@@ -43,36 +43,43 @@ import (
 type LibrariesLoader struct{}
 
 func (s *LibrariesLoader) Run(context map[string]interface{}) error {
-	if !utils.MapHas(context, constants.CTX_LIBRARIES_FOLDERS) {
-		return nil
-	}
+	sortedLibrariesFolders := []string{}
 
-	librariesFolders := context[constants.CTX_LIBRARIES_FOLDERS].([]string)
+	builtInLibrariesFolders := []string{}
+	if utils.MapHas(context, constants.CTX_BUILT_IN_LIBRARIES_FOLDERS) {
+		builtInLibrariesFolders = context[constants.CTX_BUILT_IN_LIBRARIES_FOLDERS].([]string)
+	}
+	builtInLibrariesFolders, err := utils.AbsolutizePaths(builtInLibrariesFolders)
+	if err != nil {
+		return utils.WrapError(err)
+	}
+	sortedLibrariesFolders = utils.AppendIfNotPresent(sortedLibrariesFolders, builtInLibrariesFolders...)
+
 	platform := context[constants.CTX_TARGET_PLATFORM].(*types.Platform)
 	debugLevel := utils.DebugLevel(context)
 	logger := context[constants.CTX_LOGGER].(i18n.Logger)
 
-	librariesFolders, err := utils.AbsolutizePaths(librariesFolders)
-	if err != nil {
-		return utils.WrapError(err)
-	}
-
-	librariesFolders = appendPathToLibrariesFolders(librariesFolders, filepath.Join(platform.Folder, constants.FOLDER_LIBRARIES))
-
 	actualPlatform := context[constants.CTX_ACTUAL_PLATFORM].(*types.Platform)
 	if actualPlatform != platform {
-		librariesFolders = appendPathToLibrariesFolders(librariesFolders, filepath.Join(actualPlatform.Folder, constants.FOLDER_LIBRARIES))
+		sortedLibrariesFolders = appendPathToLibrariesFolders(sortedLibrariesFolders, filepath.Join(actualPlatform.Folder, constants.FOLDER_LIBRARIES))
 	}
 
+	sortedLibrariesFolders = appendPathToLibrariesFolders(sortedLibrariesFolders, filepath.Join(platform.Folder, constants.FOLDER_LIBRARIES))
+
+	librariesFolders := []string{}
+	if utils.MapHas(context, constants.CTX_OTHER_LIBRARIES_FOLDERS) {
+		librariesFolders = context[constants.CTX_OTHER_LIBRARIES_FOLDERS].([]string)
+	}
 	librariesFolders, err = utils.AbsolutizePaths(librariesFolders)
 	if err != nil {
 		return utils.WrapError(err)
 	}
+	sortedLibrariesFolders = utils.AppendIfNotPresent(sortedLibrariesFolders, librariesFolders...)
 
-	context[constants.CTX_LIBRARIES_FOLDERS] = librariesFolders
+	context[constants.CTX_LIBRARIES_FOLDERS] = sortedLibrariesFolders
 
 	var libraries []*types.Library
-	for _, libraryFolder := range librariesFolders {
+	for _, libraryFolder := range sortedLibrariesFolders {
 		subFolders, err := utils.ReadDirFiltered(libraryFolder, utils.FilterDirs)
 		if err != nil {
 			return utils.WrapError(err)
@@ -213,9 +220,5 @@ func appendPathToLibrariesFolders(librariesFolders []string, newLibrariesFolder 
 		return librariesFolders
 	}
 
-	if utils.SliceContains(librariesFolders, newLibrariesFolder) {
-		return librariesFolders
-	}
-
-	return append(librariesFolders, newLibrariesFolder)
+	return utils.AppendIfNotPresent(librariesFolders, newLibrariesFolder)
 }

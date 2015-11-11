@@ -43,19 +43,16 @@ func (s *PrototypesAdder) Run(context map[string]interface{}) error {
 	source := context[constants.CTX_SOURCE].(string)
 	sourceRows := strings.Split(source, "\n")
 
-	if !utils.MapHas(context, constants.CTX_FIRST_FUNCTION_AT_LINE) {
+	if !utils.MapHas(context, constants.CTX_LINE_WHERE_TO_INSERT_PROTOTYPES) {
 		return nil
 	}
 
-	firstFunctionLine := context[constants.CTX_FIRST_FUNCTION_AT_LINE].(int)
+	firstFunctionLine := context[constants.CTX_LINE_WHERE_TO_INSERT_PROTOTYPES].(int)
 	if firstFunctionOutsideOfSource(firstFunctionLine, sourceRows) {
 		return nil
 	}
 
-	firstFunctionChar := len(strings.Join(sourceRows[:firstFunctionLine-1], "\n")) + 1
-	if firstFunctionLine > 1 {
-		firstFunctionLine -= context[constants.CTX_LINE_OFFSET].(int)
-	}
+	firstFunctionChar := len(strings.Join(sourceRows[:firstFunctionLine+context[constants.CTX_LINE_OFFSET].(int)-1], "\n")) + 1
 	prototypeSection := composePrototypeSection(firstFunctionLine, context[constants.CTX_PROTOTYPES].([]*types.Prototype))
 	context[constants.CTX_PROTOTYPE_SECTION] = prototypeSection
 	source = source[:firstFunctionChar] + prototypeSection + source[firstFunctionChar:]
@@ -75,7 +72,7 @@ func composePrototypeSection(line int, prototypes []*types.Prototype) string {
 	}
 
 	str := joinPrototypes(prototypes)
-	str += "#line "
+	str += "\n#line "
 	str += strconv.Itoa(line)
 	str += "\n"
 
@@ -83,11 +80,17 @@ func composePrototypeSection(line int, prototypes []*types.Prototype) string {
 }
 
 func joinPrototypes(prototypes []*types.Prototype) string {
-	join := ""
+	prototypesSlice := []string{}
 	for _, proto := range prototypes {
-		join = join + proto.Prototype + "\n"
+		prototypesSlice = append(prototypesSlice, "#line "+proto.Line)
+		prototypeParts := []string{}
+		if proto.Modifiers != "" {
+			prototypeParts = append(prototypeParts, proto.Modifiers)
+		}
+		prototypeParts = append(prototypeParts, proto.Prototype)
+		prototypesSlice = append(prototypesSlice, strings.Join(prototypeParts, " "))
 	}
-	return join
+	return strings.Join(prototypesSlice, "\n")
 }
 
 func composeIncludeArduinoSection() string {
